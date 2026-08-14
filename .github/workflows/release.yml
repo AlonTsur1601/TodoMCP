@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:installer
+      - name: Verify tag matches package version
+        run: node -e "const p=require('./package.json'); if ('v'+p.version!==process.env.GITHUB_REF_NAME) { console.error('Tag must equal v'+p.version); process.exit(1) }"
+      - name: Create source archive and checksum
+        run: |
+          git archive --format=zip --prefix="TodoMCP-${GITHUB_REF_NAME}/" --output="TodoMCP-${GITHUB_REF_NAME}.zip" HEAD
+          sha256sum "TodoMCP-${GITHUB_REF_NAME}.zip" > "TodoMCP-${GITHUB_REF_NAME}.zip.sha256"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "TodoMCP-${GITHUB_REF_NAME}.zip" "TodoMCP-${GITHUB_REF_NAME}.zip.sha256" --verify-tag --generate-notes --title "TodoMCP ${GITHUB_REF_NAME}"
