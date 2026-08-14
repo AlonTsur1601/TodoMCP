@@ -1,8 +1,12 @@
 # TodoMCP
 
+[![CI](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml)
+
 TodoMCP is a local Model Context Protocol server that helps Codex turn every actionable part of a request into atomic work, avoid unnecessary plans for small requests, and reject unsupported completion claims.
 
 It uses no model API, opens no port, and has no dependency on another MCP server. State is stored outside your repositories in the operating system's user-data directory.
+
+TodoMCP complements [CountdownMCP](https://github.com/AlonTsur1601/CountdownMCP), but both servers remain fully independent and useful on their own.
 
 ## What it does
 
