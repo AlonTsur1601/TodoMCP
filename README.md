@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml)
 
-TodoMCP is a local Model Context Protocol server that helps Codex turn every actionable part of a request into atomic work, avoid unnecessary plans for small requests, and reject unsupported completion claims.
+TodoMCP is a local Model Context Protocol server that helps Codex plan genuinely complex work and verify uncertain completion claims without burdening small, deterministic tasks with planning overhead.
 
 It uses no model API, opens no port, and has no dependency on another MCP server. State is stored outside your repositories in the operating system's user-data directory.
 
@@ -11,7 +11,8 @@ TodoMCP complements [CountdownMCP](https://github.com/AlonTsur1601/CountdownMCP)
 ## What it does
 
 - Creates stable source units from numbered lists, bullets, sentences, compound clauses, constraints, and success language.
-- Uses a compact `direct` work contract for one to three small independent actions.
+- Leaves small, clear, deterministic tasks entirely to Codex with zero TodoMCP calls.
+- Audits uncertain small results with one stateless call and no stored plan or task.
 - Requires a validated atomic plan for larger, dependent, risky, or multi-system work.
 - Maps every source unit to an explicit requirement disposition.
 - Blocks tasks whose dependencies are incomplete.
@@ -56,21 +57,26 @@ codex mcp add todo_mcp -- node C:\absolute\path\to\TodoMCP\dist\src\index.js
 
 ## Workflow
 
-1. `todo_analyze_request` returns stable source units and recommends `direct` or `plan` mode.
-2. Codex maps every unit to a requirement and submits `todo_create_plan`.
-3. Codex starts only ready work with `todo_start_task`.
-4. `todo_audit_completion` checks every criterion, evidence strength, raw signal, failure sensitivity, boundary coverage, and referenced artifacts.
-5. `todo_close_plan` succeeds only when every task and active requirement is verified.
+1. For an obviously small deterministic task, Codex works independently and makes no TodoMCP calls.
+2. For small work with meaningful completion uncertainty, Codex works independently and may call `todo_audit_result` once at the end. This creates no persistent TodoMCP state.
+3. For genuinely complex work, `todo_analyze_request` returns stable source units and recommends a plan.
+4. Codex maps every unit to a requirement and submits `todo_create_plan` once.
+5. `todo_audit_completion` checks a planned task and can auto-start it when its dependencies are ready, avoiding a separate start call.
+6. `todo_close_plan` is called once after the final approved task.
 
 Rejected plans are retained as drafts so Codex can repair them with `todo_revise_plan`. There is no force-complete operation.
 
-## Direct mode
+## Small tasks and tool-call budget
 
-Direct mode is for at most three genuinely small, independent, low-risk actions. TodoMCP still retains an internal verification contract, but Codex does not need to display a contrived checklist to the user.
+Small does not mean that Codex must create a shorter TodoMCP plan. It means Codex should work without TodoMCP state. A precise edit with an immediately observable result, such as replacing one known line with exact text, needs no TodoMCP analysis, task creation, start, audit, or close call.
+
+If a small task has meaningful uncertainty—such as runtime behavior, a bug fix, an integration boundary, or user-visible behavior—Codex may make one `todo_audit_result` call after doing the work. The caller must state why completion is uncertain. If neither the request nor the caller supplies an uncertainty reason, the tool skips the audit.
+
+The legacy `direct` plan input remains accepted for backward compatibility, but clients should not create direct plans for ordinary small work.
 
 ## Verification quality
 
-Each acceptance criterion declares its minimum evidence level: `static`, `build`, `unit`, `integration`, `runtime`, or `manual`. Evidence must include the target, input, expected and observed signals, substantive raw output, and an explanation of how the check detects failure.
+For planned work and uncertain independent results, each acceptance criterion declares its minimum evidence level: `static`, `build`, `unit`, `integration`, `runtime`, or `manual`. Evidence must include the target, input, expected and observed signals, substantive raw output, and an explanation of how the check detects failure.
 
 Behavioral criteria cannot be satisfied by build-only evidence. User-visible criteria can require observation through the public interface, and criteria can require negative or boundary cases. Failure-sensitivity explanations must identify a concrete failing, changed, rejected, negative, or pre-fix signal. Explicit artifact paths are confined to the registered workspace, limited to 1 MiB, and SHA-256 checked. Artifacts declared as `test_source` are also inspected for a recognizable assertion or failure check, so a script that only prints `PASS` is rejected.
 

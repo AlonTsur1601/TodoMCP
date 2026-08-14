@@ -14,7 +14,10 @@ export interface RequestAnalysis {
   requestHash: string;
   sourceUnits: SourceUnit[];
   recommendedMode: "direct" | "plan";
+  recommendedAction: "work_independently" | "create_plan";
   reasons: string[];
+  completionAuditRecommended: boolean;
+  completionAuditReasons: string[];
 }
 
 export type TaskStatus = "pending" | "in_progress" | "completed";

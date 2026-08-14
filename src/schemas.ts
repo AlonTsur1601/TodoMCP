@@ -114,6 +114,16 @@ export const AuditCompletionInputSchema = PlanReferenceSchema.extend({
   unresolvedIssues: z.array(z.string().min(1)).max(5_000).default([]),
 }).strict();
 
+export const AuditResultInputSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  originalRequest: z.string().min(1).max(100_000),
+  summary: z.string().min(1).max(20_000),
+  acceptanceCriteria: z.array(CriterionSchema).min(1).max(500),
+  evidence: z.array(EvidenceSchema).min(1).max(5_000),
+  uncertaintyReasons: z.array(z.string().min(1).max(2_000)).max(100).default([]),
+  unresolvedIssues: z.array(z.string().min(1)).max(5_000).default([]),
+}).strict();
+
 export type EvidenceLevel = z.infer<typeof EvidenceLevelSchema>;
 export type RequirementInput = z.infer<typeof RequirementSchema>;
 export type CriterionInput = z.infer<typeof CriterionSchema>;

@@ -51,7 +51,7 @@ async function verifyArtifact(workspaceRoot: string, evidence: EvidenceInput): P
 
 export async function auditTaskEvidence(
   workspaceRoot: string,
-  task: StoredTask,
+  task: Pick<StoredTask, "acceptanceCriteria">,
   evidenceItems: EvidenceInput[],
   unresolvedIssues: string[],
 ): Promise<{ approved: boolean; issues: string[]; artifactHashes: Record<string, string> }> {

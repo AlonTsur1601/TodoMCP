@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { analyzeRequest } from "./analyzer.js";
 import { auditTaskEvidence } from "./evidence.js";
 import type {
+  CriterionInput,
   EvidenceInput,
   PlanDefinitionInput,
   RequirementInput,
@@ -242,21 +243,87 @@ export class TodoService {
     if (!plan.accepted || plan.status !== "active") throw new Error("Only accepted active plans can complete tasks.");
     const task = plan.tasks.find((candidate) => candidate.id === taskId);
     if (!task) throw new Error(`Unknown task ${taskId}.`);
-    if (task.status !== "in_progress") throw new Error(`Task ${taskId} must be started before completion audit.`);
+    let autoStarted = false;
+    if (task.status === "pending") {
+      const ready = new Set(readyTasks(plan).map((candidate) => candidate.id));
+      if (!ready.has(taskId)) throw new Error(`Task ${taskId} is blocked by incomplete dependencies.`);
+      task.status = "in_progress";
+      task.startedAt = now();
+      autoStarted = true;
+    }
+    if (task.status !== "in_progress") throw new Error(`Task ${taskId} cannot be audited from status ${task.status}.`);
     const audit = await auditTaskEvidence(workspaceRoot, task, evidence, unresolvedIssues);
     task.verificationAttempts.push({ attemptedAt: now(), approved: audit.approved, summary, evidence, issues: audit.issues, artifactHashes: audit.artifactHashes });
     if (audit.approved) {
       task.status = "completed";
       task.completedAt = now();
     }
+    const readyToClose = audit.approved && plan.tasks.every((candidate) => candidate.status === "completed");
     plan.updatedAt = now();
     plan.stateVersion += 1;
-    await this.store.write(plan, { type: "completion_audited", taskId, approved: audit.approved, issues: audit.issues }, expectedStateVersion);
-    return { taskId, approved: audit.approved, status: task.status, issues: audit.issues, artifactHashes: audit.artifactHashes };
+    await this.store.write(plan, {
+      type: "completion_audited",
+      taskId,
+      approved: audit.approved,
+      autoStarted,
+      readyToClose,
+      issues: audit.issues,
+    }, expectedStateVersion);
+    return {
+      taskId,
+      approved: audit.approved,
+      status: task.status,
+      autoStarted,
+      readyToClose,
+      issues: audit.issues,
+      artifactHashes: audit.artifactHashes,
+    };
+  }
+
+  async auditResult(
+    workspaceRoot: string,
+    originalRequest: string,
+    summary: string,
+    acceptanceCriteria: CriterionInput[],
+    evidence: EvidenceInput[],
+    uncertaintyReasons: string[],
+    unresolvedIssues: string[],
+  ) {
+    const analysis = analyzeRequest(originalRequest);
+    const reasons = [...new Set([...analysis.completionAuditReasons, ...uncertaintyReasons])];
+    if (reasons.length === 0) {
+      return {
+        auditPerformed: false,
+        approved: null,
+        requestHash: analysis.requestHash,
+        reason: "Completion is deterministic enough to verify directly; no TodoMCP audit is needed.",
+        issues: [],
+        artifactHashes: {},
+      };
+    }
+    const audit = await auditTaskEvidence(workspaceRoot, { acceptanceCriteria }, evidence, unresolvedIssues);
+    return {
+      auditPerformed: true,
+      approved: audit.approved,
+      requestHash: analysis.requestHash,
+      uncertaintyReasons: reasons,
+      summary,
+      issues: audit.issues,
+      artifactHashes: audit.artifactHashes,
+    };
   }
 
   async closePlan(workspaceRoot: string, planId: string) {
     const plan = await this.store.read(workspaceRoot, planId);
+    if (plan.status === "closed") {
+      return {
+        planId,
+        closed: true,
+        closedAt: plan.closedAt,
+        alreadyClosed: true,
+        verificationSummary: plan.tasks.map((task) => ({ taskId: task.id, attempts: task.verificationAttempts.length, approvedAt: task.completedAt })),
+      };
+    }
     const expectedStateVersion = plan.stateVersion;
     if (!plan.accepted) throw new Error("A rejected draft cannot be closed.");
     const incomplete = plan.tasks.filter((task) => task.status !== "completed").map((task) => task.id);

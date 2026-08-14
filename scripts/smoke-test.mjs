@@ -31,6 +31,7 @@ try {
     "todo_get_execution_candidates",
     "todo_apply_execution_advice",
     "todo_audit_completion",
+    "todo_audit_result",
     "todo_close_plan",
   ];
   const names = new Set(tools.tools.map((tool) => tool.name));

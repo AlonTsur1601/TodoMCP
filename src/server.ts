@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ApplyAdviceInputSchema,
   AuditCompletionInputSchema,
+  AuditResultInputSchema,
   CreatePlanInputSchema,
   PlanReferenceSchema,
   RequestAnalysisInputSchema,
@@ -11,9 +12,13 @@ import {
 } from "./schemas.js";
 import { TodoService } from "./service.js";
 
-const INSTRUCTIONS = `For multi-part work, call todo_analyze_request before planning. Every actionable source unit must map to an active requirement and an atomic task. Use direct mode only for 1-3 genuinely small independent actions. Never claim a task is complete until todo_audit_completion returns approved=true, and never claim the whole request is complete until todo_close_plan succeeds. Delegation recommendations are advisory and capped at 3 agents.
+const INSTRUCTIONS = `Minimize TodoMCP tool calls. For an obviously small, clear, deterministic task, do the work independently and make zero TodoMCP calls: do not analyze it, create a plan, start a task, or audit an outcome that is directly observable. A simple exact edit such as replacing one known line is deterministic and needs no TodoMCP validation.
 
-When countdown_advise_work is available, pass it todo_get_execution_candidates and return its ranking through todo_apply_execution_advice. Countdown advice may reorder ready tasks but never bypass dependencies, scope, or verification. Continue normally when CountdownMCP is unavailable. Do not expose internal plan lists for direct mode unless useful to the user.`;
+For small work with meaningful completion uncertainty, still work independently without creating TodoMCP state. At the end, make at most one call to todo_audit_result with the concrete uncertainty reasons and evidence. If there is no meaningful uncertainty, do not call it.
+
+For genuinely multi-step, dependent, risky, or broad work, call todo_analyze_request once and create an atomic plan. Every actionable source unit must map to an active requirement and task. Avoid todo_get_plan unless recovering state or resolving a real ambiguity. todo_audit_completion can auto-start a ready task, so omit separate todo_start_task calls unless ownership, scheduling, or explicit state control requires them. Close the plan once after the final approved audit. Delegation recommendations are advisory and capped at 3 agents.
+
+Use CountdownMCP coordination only when usage-aware scheduling can materially change which ready task should run. Do not invoke the three-step Countdown exchange for small work or repeatedly without a meaningful state or usage change. Countdown advice may reorder ready tasks but never bypass dependencies, scope, or verification. Continue normally when CountdownMCP is unavailable.`;
 
 function toolResult(result: unknown, message: string) {
   return {
@@ -32,7 +37,7 @@ export function createServer(service = new TodoService()): McpServer {
 
   server.registerTool("todo_analyze_request", {
     title: "Analyze request into source units",
-    description: "Use before planning multi-part work. Deterministically identifies source clauses, constraints, success criteria, and whether a visible plan is warranted.",
+    description: "Use once only when work may require a plan. Do not call for obviously small deterministic work. Identifies source clauses, uncertainty, and whether Codex should work independently or create a plan.",
     inputSchema: RequestAnalysisInputSchema,
     outputSchema: GenericOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -40,7 +45,7 @@ export function createServer(service = new TodoService()): McpServer {
 
   server.registerTool("todo_create_plan", {
     title: "Create and validate a work contract",
-    description: "Submit a direct work contract or atomic plan. Rejected submissions remain drafts and cannot execute.",
+    description: "Create an atomic plan for genuinely complex work. Small work should run independently; direct contracts remain supported for compatibility.",
     inputSchema: CreatePlanInputSchema,
     outputSchema: GenericOutputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -117,7 +122,7 @@ export function createServer(service = new TodoService()): McpServer {
 
   server.registerTool("todo_audit_completion", {
     title: "Audit task completion evidence",
-    description: "Audit every acceptance criterion and the quality of its verification. Only approved evidence can complete a task.",
+    description: "Audit a planned task. A ready pending task is auto-started to avoid a separate start call; the result reports when the plan is ready to close.",
     inputSchema: AuditCompletionInputSchema,
     outputSchema: GenericOutputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -126,9 +131,20 @@ export function createServer(service = new TodoService()): McpServer {
     "Completion evidence audited.",
   ));
 
+  server.registerTool("todo_audit_result", {
+    title: "Audit an uncertain independent result",
+    description: "Use at most once after small independent work, and only when completion has meaningful uncertainty. Creates no plan or task state; deterministic edits are skipped.",
+    inputSchema: AuditResultInputSchema,
+    outputSchema: GenericOutputSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  }, async ({ workspaceRoot, originalRequest, summary, acceptanceCriteria, evidence, uncertaintyReasons, unresolvedIssues }) => toolResult(
+    await service.auditResult(workspaceRoot, originalRequest, summary, acceptanceCriteria, evidence, uncertaintyReasons, unresolvedIssues),
+    "Independent completion evidence assessed.",
+  ));
+
   server.registerTool("todo_close_plan", {
     title: "Close a fully verified plan",
-    description: "Close a plan only after every active requirement and task has approved evidence. There is no force-complete path.",
+    description: "Close a fully verified plan once after the final approved audit. There is no force-complete path.",
     inputSchema: PlanReferenceSchema,
     outputSchema: GenericOutputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

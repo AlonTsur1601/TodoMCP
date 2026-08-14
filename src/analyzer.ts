@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { RequestAnalysis, SourceUnit, SourceUnitKind } from "./types.js";
 
+const COMPLETION_UNCERTAINTY_RE = /(?:\bdebug(?:ged|ging)?\b|\binvestigat(?:e|es|ed|ing|ion)\b|\bbug\b|\bbehavio[u]?r\b|\bruntime\b|\bintegration\b|\bend[- ]?to[- ]?end\b|\buser[- ]visible\b|\bworks? correctly\b|\bverify\b|\bensure\b|\bvalidate\b|\u05D1\u05D0\u05D2|\u05EA\u05E7\u05DC\u05D4|\u05D4\u05EA\u05E0\u05D4\u05D2\u05D5\u05EA|\u05D0\u05D9\u05E0\u05D8\u05D2\u05E8\u05E6\u05D9\u05D4|\u05DE\u05DE\u05E9\u05E7|\u05D5\u05D3\u05D0|\u05D0\u05DE\u05EA|\u05EA\u05E7\u05E3)/iu;
+
 const CONSTRAINT_RE = /(?:\bonly\b|\bmust\b|\bnever\b|\bwithout\b|\bdo not\b|\bdon't\b|\bshould not\b|רק|חייב|אסור|לעולם לא|בלי|אל |לא לשנות|לא לגעת)/iu;
 const SUCCESS_RE = /(?:\bverify\b|\bensure\b|\bacceptance\b|\bpasses?\b|\bsuccess\b|לוודא|ודא|אימות|בדיקה|הצלחה|יעבור)/iu;
 const CONTEXT_RE = /(?:\bfor context\b|\bbackground\b|לרקע|רקע בלבד|שים לב ש)/iu;
@@ -57,6 +59,7 @@ export function analyzeRequest(request: string): RequestAnalysis {
     if (SUCCESS_RE.test(text)) signals.push("verification_language");
     if (DEPENDENCY_RE.test(text)) signals.push("dependency_language");
     if (HIGH_RISK_RE.test(text)) signals.push("high_risk_language");
+    if (COMPLETION_UNCERTAINTY_RE.test(text)) signals.push("completion_uncertainty");
     if (text.length > 240) signals.push("long_clause");
     return {
       id: `src_${hash(`${ordinal}\0${text}`).slice(0, 12)}`,
@@ -73,11 +76,19 @@ export function analyzeRequest(request: string): RequestAnalysis {
   if (sourceUnits.some((unit) => unit.signals.includes("dependency_language"))) reasons.push("dependency_language_detected");
   if (sourceUnits.some((unit) => unit.signals.includes("high_risk_language"))) reasons.push("high_risk_language_detected");
   if (sourceUnits.some((unit) => unit.signals.includes("long_clause"))) reasons.push("long_clause_requires_review");
+  const recommendedMode = reasons.length > 0 || actionable.length > 3 ? "plan" : "direct";
+  const completionAuditReasons: string[] = [];
+  if (recommendedMode === "plan") completionAuditReasons.push("multi_step_work_has_completion_uncertainty");
+  if (sourceUnits.some((unit) => unit.signals.includes("completion_uncertainty"))) completionAuditReasons.push("completion_uncertainty_detected");
+  if (sourceUnits.some((unit) => unit.kind === "success_criterion")) completionAuditReasons.push("explicit_success_criterion_detected");
 
   return {
     requestHash,
     sourceUnits,
-    recommendedMode: reasons.length > 0 || actionable.length > 3 ? "plan" : "direct",
+    recommendedMode,
+    recommendedAction: recommendedMode === "plan" ? "create_plan" : "work_independently",
     reasons,
+    completionAuditRecommended: completionAuditReasons.length > 0,
+    completionAuditReasons,
   };
 }

@@ -95,7 +95,6 @@ test("weak evidence is rejected and strong evidence completes direct work", asyn
     const candidate = definition(env.service, env.workspace, "Create the server.", "direct");
     const created = await env.service.createPlan(candidate);
     assert.equal(created.accepted, true);
-    await env.service.startTask(env.workspace, created.planId, "task-1");
     const weak = await env.service.auditCompletion(env.workspace, created.planId, "task-1", "done", [{
       criterionId: "task-1-criterion",
       method: "build",
@@ -109,6 +108,7 @@ test("weak evidence is rejected and strong evidence completes direct work", asyn
       boundaryCases: [],
     }], []);
     assert.equal(weak.approved, false);
+    assert.equal(weak.autoStarted, true);
     assert.ok(weak.issues.length >= 4);
 
     const strong = await env.service.auditCompletion(
@@ -120,6 +120,8 @@ test("weak evidence is rejected and strong evidence completes direct work", asyn
       [],
     );
     assert.equal(strong.approved, true);
+    assert.equal(strong.autoStarted, false);
+    assert.equal(strong.readyToClose, true);
     const closed = await env.service.closePlan(env.workspace, created.planId);
     assert.equal(closed.closed, true);
 

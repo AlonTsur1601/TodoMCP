@@ -2,11 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { analyzeRequest } from "../src/analyzer.js";
 
-test("small independent request recommends direct mode", () => {
+test("small deterministic work recommends independent execution with no completion audit", () => {
   const result = analyzeRequest("Update the README. Run the tests.");
   assert.equal(result.sourceUnits.length, 2);
   assert.equal(result.recommendedMode, "direct");
+  assert.equal(result.recommendedAction, "work_independently");
+  assert.equal(result.completionAuditRecommended, false);
   assert.ok(result.sourceUnits.every((unit) => unit.id.startsWith("src_")));
+});
+
+test("small uncertain work stays independent but recommends one completion audit", () => {
+  const result = analyzeRequest("Fix the runtime bug.");
+  assert.equal(result.recommendedMode, "direct");
+  assert.equal(result.recommendedAction, "work_independently");
+  assert.equal(result.completionAuditRecommended, true);
+  assert.ok(result.completionAuditReasons.includes("completion_uncertainty_detected"));
+});
+
+test("an exact small fix remains deterministic despite generic fix wording", () => {
+  const result = analyzeRequest("Fix the typo by replacing teh with the.");
+  assert.equal(result.recommendedAction, "work_independently");
+  assert.equal(result.completionAuditRecommended, false);
 });
 
 test("compound list item is split into separate source units", () => {
@@ -17,6 +33,8 @@ test("compound list item is split into separate source units", () => {
   ].join("\n"));
   assert.equal(result.sourceUnits.length, 4);
   assert.equal(result.recommendedMode, "plan");
+  assert.equal(result.recommendedAction, "create_plan");
+  assert.equal(result.completionAuditRecommended, true);
   assert.match(result.sourceUnits[1]!.text, /unit tests/i);
   assert.match(result.sourceUnits[2]!.text, /smoke test/i);
 });
