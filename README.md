@@ -22,15 +22,25 @@ It uses no model API, opens no port, and has no dependency on another MCP server
 
 ## Install
 
-Clone or download the repository, then run:
+Clone the repository and run the installer:
 
 ```powershell
+git clone https://github.com/AlonTsur1601/TodoMCP.git
+Set-Location TodoMCP
 node install.mjs
 ```
 
 The installer builds and smoke-tests the server before atomically copying it to `CODEX_HOME/mcp/todo-mcp`. It replaces only the `todo_mcp` registration and rolls back that registration and the installed files if setup fails. Restart Codex after installation.
 
-An installed copy is a local snapshot. New Git commits and GitHub Releases do not update it automatically. To update, download or pull the newer source, run `node install.mjs` again, and restart Codex.
+An installed copy is a local snapshot. New Git commits and GitHub Releases do not update it automatically. To update an existing clone, pull the newer source and rerun the installer:
+
+```powershell
+Set-Location TodoMCP
+git pull --ff-only
+node install.mjs
+```
+
+Restart Codex after installing or updating.
 
 For development without installing:
 
