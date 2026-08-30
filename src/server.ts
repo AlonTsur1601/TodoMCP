@@ -48,7 +48,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Create an atomic plan for genuinely complex work. Small work should run independently; direct contracts remain supported for compatibility.",
     inputSchema: CreatePlanInputSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   }, async (input) => toolResult(await service.createPlan(input), "Plan candidate validated and stored."));
 
   server.registerTool("todo_revise_plan", {
@@ -56,7 +56,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Replace a draft or active plan while retaining history. Changed completion contracts invalidate prior completion.",
     inputSchema: RevisePlanInputSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   }, async ({ workspaceRoot, planId, revisionReason, ...definition }) => toolResult(
     await service.revisePlan(workspaceRoot, planId, revisionReason, definition),
     "Plan revision validated and stored.",
@@ -75,7 +75,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Start an atomic task only when all dependencies are complete.",
     inputSchema: StartTaskInputSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   }, async ({ workspaceRoot, planId, taskId, owner }) => toolResult(
     await service.startTask(workspaceRoot, planId, taskId, owner),
     "Task started.",
@@ -108,7 +108,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Apply a neutral advisor ranking to ready tasks. Unknown or blocked task ids are rejected; dependencies are never bypassed.",
     inputSchema: ApplyAdviceInputSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   }, async ({ workspaceRoot, planId, advice }) => toolResult(
     await service.applyExecutionAdvice(workspaceRoot, planId, {
       recommendedNow: advice.recommendedNow,
@@ -125,7 +125,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Audit a planned task. A ready pending task is auto-started to avoid a separate start call; the result reports when the plan is ready to close.",
     inputSchema: AuditCompletionInputSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   }, async ({ workspaceRoot, planId, taskId, summary, evidence, unresolvedIssues }) => toolResult(
     await service.auditCompletion(workspaceRoot, planId, taskId, summary, evidence, unresolvedIssues),
     "Completion evidence audited.",
@@ -147,7 +147,7 @@ export function createServer(service = new TodoService()): McpServer {
     description: "Close a fully verified plan once after the final approved audit. There is no force-complete path.",
     inputSchema: PlanReferenceSchema,
     outputSchema: GenericOutputSchema,
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
   }, async ({ workspaceRoot, planId }) => toolResult(await service.closePlan(workspaceRoot, planId), "Plan closure checked."));
 
   return server;

@@ -115,6 +115,8 @@ Codex may pass this result to `countdown_advise_work`, then pass the returned `r
 
 Tool input is untrusted. TodoMCP uses strict schemas, atomic state writes, per-plan locks, path containment checks, and stderr-only diagnostics. It does not execute verification commands or read another MCP server's state.
 
+See the [Privacy Policy](PRIVACY.md) for the data TodoMCP stores locally and how to remove it.
+
 ## Development
 
 ```powershell

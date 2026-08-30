@@ -20,18 +20,39 @@ test("MCP exposes eleven namespaced tools with accurate annotations and strict i
     assert.match(client.getInstructions() ?? "", /zero TodoMCP calls/);
     assert.match(client.getInstructions() ?? "", /at most one call to todo_audit_result/);
     const listed = await client.listTools();
-    assert.equal(listed.tools.length, 11);
-    assert.ok(listed.tools.every((tool) => tool.name.startsWith("todo_")));
+    const expectedTools = [
+      "todo_analyze_request",
+      "todo_create_plan",
+      "todo_revise_plan",
+      "todo_get_plan",
+      "todo_start_task",
+      "todo_recommend_delegation",
+      "todo_get_execution_candidates",
+      "todo_apply_execution_advice",
+      "todo_audit_completion",
+      "todo_audit_result",
+      "todo_close_plan",
+    ];
+    assert.deepEqual(listed.tools.map((tool) => tool.name).sort(), expectedTools.sort());
     const analyze = listed.tools.find((tool) => tool.name === "todo_analyze_request")!;
     const create = listed.tools.find((tool) => tool.name === "todo_create_plan")!;
     const independentAudit = listed.tools.find((tool) => tool.name === "todo_audit_result")!;
     assert.equal(analyze.annotations?.readOnlyHint, true);
     assert.equal(create.annotations?.readOnlyHint, false);
     assert.equal(independentAudit.annotations?.readOnlyHint, true);
+    assert.ok(listed.tools.every((tool) => (
+      typeof tool.annotations?.readOnlyHint === "boolean"
+      && typeof tool.annotations.destructiveHint === "boolean"
+      && typeof tool.annotations.idempotentHint === "boolean"
+      && typeof tool.annotations.openWorldHint === "boolean"
+    )));
     assert.ok(listed.tools.every((tool) => tool.annotations?.destructiveHint === false && tool.annotations?.openWorldHint === false));
+    assert.ok(listed.tools.every((tool) => tool.inputSchema.type === "object"));
 
-    const invalid = await client.callTool({ name: "todo_analyze_request", arguments: { request: "", extra: true } });
-    assert.equal(invalid.isError, true);
+    for (const name of expectedTools) {
+      const invalid = await client.callTool({ name, arguments: { unexpected: true } });
+      assert.equal(invalid.isError, true, `${name} accepted input outside its declared schema`);
+    }
   } finally {
     await client.close();
     await server.close();

@@ -42,6 +42,9 @@ try {
   } }, null, 2)}\n`, "utf8");
   if (process.platform === "win32") {
     await writeFile(wrapper, `@echo off\r\n"${process.execPath}" "${fakeCli}" %*\r\n`, "utf8");
+    const unsafe = runInstaller({ TODO_MCP_CODEX_COMMAND: join(root, "fake%PATH%.cmd") });
+    assert.notEqual(unsafe.status, 0, "Installer accepted an unsafe Windows command wrapper path.");
+    assert.match(unsafe.stderr, /cannot contain NUL, line breaks, quotes, or percent signs/);
   } else {
     await writeFile(wrapper, `#!/bin/sh\nexec "${process.execPath}" "${fakeCli}" "$@"\n`, "utf8");
     await chmod(wrapper, 0o755);
@@ -59,6 +62,7 @@ try {
   const installed = runInstaller();
   assert.equal(installed.status, 0, `Installer failed:\n${installed.stdout}\n${installed.stderr}`);
   assert.ok(existsSync(join(oldTarget, "dist", "src", "index.js")));
+  assert.ok(existsSync(join(oldTarget, "PRIVACY.md")));
   assert.equal((await readFile(join(oldTarget, ".installed-version"), "utf8")).trim(), manifest.version);
   state = JSON.parse(await readFile(statePath, "utf8"));
   assert.ok(state.registrations.todo_mcp.transport.args[0].endsWith("dist\\src\\index.js")

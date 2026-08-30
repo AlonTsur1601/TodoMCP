@@ -38,9 +38,16 @@ const codexCommand = resolveCodexCommand();
 
 function run(command, args, options = {}) {
   const isWindowsWrapper = process.platform === "win32" && command.toLowerCase().endsWith(".cmd");
+  if (isWindowsWrapper) {
+    for (const value of [command, ...args]) {
+      if (/[\0\r\n"%]/u.test(String(value))) {
+        throw new Error("Windows command wrapper paths and arguments cannot contain NUL, line breaks, quotes, or percent signs.");
+      }
+    }
+  }
   const actualCommand = isWindowsWrapper ? process.env.ComSpec ?? "cmd.exe" : command;
   const actualArgs = isWindowsWrapper
-    ? ["/d", "/s", "/c", `call "${command.replaceAll('"', '""')}" ${args.map((arg) => `"${String(arg).replaceAll('"', '""')}"`).join(" ")}`]
+    ? ["/d", "/v:off", "/s", "/c", `call "${command}" ${args.map((arg) => `"${String(arg)}"`).join(" ")}`]
     : args;
   const result = spawnSync(actualCommand, actualArgs, {
     cwd: options.cwd ?? sourceRoot,
@@ -104,6 +111,7 @@ async function prepareStaging() {
   await cp(join(sourceRoot, "package.json"), join(staging, "package.json"));
   await cp(join(sourceRoot, "package-lock.json"), join(staging, "package-lock.json"));
   await cp(join(sourceRoot, "LICENSE"), join(staging, "LICENSE"));
+  await cp(join(sourceRoot, "PRIVACY.md"), join(staging, "PRIVACY.md"));
   await cp(join(sourceRoot, "README.md"), join(staging, "README.md"));
   run(npmCommand, ["ci", "--omit=dev", "--ignore-scripts"], { cwd: staging, capture: true });
   const manifest = JSON.parse(await readFile(join(staging, "package.json"), "utf8"));
