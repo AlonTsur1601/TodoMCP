@@ -1,6 +1,7 @@
 # TodoMCP
 
 [![CI](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AlonTsur1601/TodoMCP/actions/workflows/ci.yml)
+[![M8ven Score](https://m8ven.ai/badge/mcp/alontsur1601-todomcp-1xc7s2)](https://m8ven.ai/mcp/alontsur1601-todomcp-1xc7s2)
 
 TodoMCP is a local Model Context Protocol server that helps Codex plan genuinely complex work and verify uncertain completion claims without burdening small, deterministic tasks with planning overhead.
 
