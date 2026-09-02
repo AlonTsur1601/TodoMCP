@@ -2,6 +2,7 @@
 
 ## 0.1.0 - Unreleased
 
+- Installer also registers TodoMCP with Claude Code when its CLI is detected, in addition to Codex.
 - Small deterministic work now uses zero TodoMCP calls and creates no plan state.
 - Small uncertain work can use one stateless `todo_audit_result` call after execution.
 - Planned completion audits can auto-start ready tasks, reducing per-task tool calls.

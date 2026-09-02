@@ -34,7 +34,15 @@ function resolveCodexCommand() {
   return findOnPath(["codex.cmd", "codex.exe"]);
 }
 
+function resolveClaudeCommand() {
+  if (process.env.TODO_MCP_CLAUDE_COMMAND) return process.env.TODO_MCP_CLAUDE_COMMAND;
+  if (process.env.CLAUDE_CLI_PATH && existsSync(process.env.CLAUDE_CLI_PATH)) return process.env.CLAUDE_CLI_PATH;
+  if (process.platform !== "win32") return "claude";
+  return findOnPath(["claude.cmd", "claude.exe"]);
+}
+
 const codexCommand = resolveCodexCommand();
+const claudeCommand = resolveClaudeCommand();
 
 function run(command, args, options = {}) {
   const isWindowsWrapper = process.platform === "win32" && command.toLowerCase().endsWith(".cmd");
@@ -104,6 +112,23 @@ function restoreRegistration(previous) {
   throw new Error("The previous todo_mcp registration used an unsupported transport and could not be restored automatically.");
 }
 
+// Registers TodoMCP with Claude Code when its CLI is present on this
+// machine. This is best-effort and additive only: it never gates or rolls
+// back the Codex installation above, since a machine may have either CLI,
+// both, or neither installed.
+function registerWithClaudeCode(scriptPath) {
+  const detected = run(claudeCommand, ["--version"], { capture: true, allowFailure: true });
+  if (detected.status !== 0) return false;
+  run(claudeCommand, ["mcp", "remove", "todo_mcp"], { capture: true, allowFailure: true });
+  const added = run(claudeCommand, ["mcp", "add", "todo_mcp", "--", process.execPath, scriptPath], { capture: true, allowFailure: true });
+  if (added.status !== 0) {
+    process.stderr.write(`Claude Code detected but registration failed: ${added.stderr ?? ""}\n`);
+    return false;
+  }
+  process.stdout.write("TodoMCP also registered with Claude Code as todo_mcp. Restart Claude Code before use.\n");
+  return true;
+}
+
 async function prepareStaging() {
   await mkdir(staging, { recursive: true });
   await mkdir(join(staging, "dist"), { recursive: true });
@@ -142,9 +167,12 @@ async function main() {
     }
     await rename(staging, target);
     removeRegistration();
-    addRegistration(join(target, "dist", "src", "index.js"));
+    const scriptPath = join(target, "dist", "src", "index.js");
+    addRegistration(scriptPath);
     if (movedExisting) await rm(backup, { recursive: true, force: true });
     process.stdout.write("TodoMCP installed and registered as todo_mcp. Restart Codex before use.\n");
+
+    registerWithClaudeCode(scriptPath);
   } catch (error) {
     removeRegistration();
     try { restoreRegistration(previousRegistration); } catch (restoreError) {
