@@ -172,7 +172,6 @@ async function main() {
     if (movedExisting) await rm(backup, { recursive: true, force: true });
     process.stdout.write("TodoMCP installed and registered as todo_mcp. Restart Codex before use.\n");
 
-    registerWithClaudeCode(scriptPath);
   } catch (error) {
     removeRegistration();
     try { restoreRegistration(previousRegistration); } catch (restoreError) {
@@ -184,6 +183,14 @@ async function main() {
   } finally {
     await rm(staging, { recursive: true, force: true });
     await rm(backup, { recursive: true, force: true });
+  }
+  // Optional client registration runs only after the Codex transaction commits.
+  try {
+    registerWithClaudeCode(join(target, "dist", "src", "index.js"));
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      process.stderr.write(`Optional Claude Code registration failed: ${error.message}\n`);
+    }
   }
 }
 

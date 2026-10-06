@@ -26,6 +26,7 @@ function runInstaller(extraEnv = {}) {
       ...process.env,
       CODEX_HOME: codexHome,
       TODO_MCP_CODEX_COMMAND: wrapper,
+      TODO_MCP_CLAUDE_COMMAND: join(root, "missing-claude"),
       FAKE_CODEX_STATE: statePath,
       ...extraEnv,
     },
@@ -68,6 +69,13 @@ try {
   assert.ok(state.registrations.todo_mcp.transport.args[0].endsWith("dist\\src\\index.js")
     || state.registrations.todo_mcp.transport.args[0].endsWith("dist/src/index.js"));
   assert.ok(state.registrations.preserved_mcp);
+  const claudeFailure = runInstaller({ TODO_MCP_CLAUDE_COMMAND: root });
+  assert.equal(claudeFailure.status, 0, `Optional Claude launch failure rolled back Codex:\n${claudeFailure.stderr}`);
+  assert.ok(existsSync(join(oldTarget, "dist", "src", "index.js")));
+  state = JSON.parse(await readFile(statePath, "utf8"));
+  assert.ok(state.registrations.todo_mcp.transport.args[0].endsWith("index.js"));
+  assert.ok(state.registrations.preserved_mcp);
+  assert.ok(!(await readdir(join(codexHome, "mcp"))).some((name) => name.startsWith(".todo-mcp-")));
   process.stdout.write("TODO_MCP_INSTALLER_PASS rollback=1 install=1 preserved=1\n");
 } finally {
   await rm(root, { recursive: true, force: true });
